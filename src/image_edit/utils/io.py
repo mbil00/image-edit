@@ -11,6 +11,54 @@ from PIL import Image
 from .image import detect_format, format_from_extension, ImageFormat
 
 
+def read_multiple_images(
+    input_paths: list[Path],
+    allow_stdin_fallback: bool = True,
+) -> list[tuple[bytes, Optional[ImageFormat]]]:
+    """
+    Read multiple image files.
+
+    If only one path provided and stdin has data, uses stdin as second image.
+
+    Args:
+        input_paths: List of paths to input files
+        allow_stdin_fallback: If True and only one path, try to read stdin as second image
+
+    Returns:
+        List of (image bytes, detected format) tuples
+
+    Raises:
+        click.ClickException: If input cannot be read or is empty
+    """
+    images: list[tuple[bytes, Optional[ImageFormat]]] = []
+
+    # Read all specified input files
+    for path in input_paths:
+        if not path.exists():
+            raise click.ClickException(f"Input file not found: {path}")
+
+        data = path.read_bytes()
+        if not data:
+            raise click.ClickException(f"Input file is empty: {path}")
+
+        # Try to detect format from content first, then extension
+        fmt = detect_format(data)
+        if fmt is None:
+            fmt = format_from_extension(path.suffix)
+
+        images.append((data, fmt))
+
+    # If only one path and stdin has data, use stdin as additional image
+    if len(input_paths) == 1 and allow_stdin_fallback and not sys.stdin.isatty():
+        stdin = click.get_binary_stream("stdin")
+        stdin_data = stdin.read()
+        if stdin_data:
+            stdin_fmt = detect_format(stdin_data)
+            images.insert(0, (stdin_data, stdin_fmt))  # stdin image first
+
+    return images
+
+
 def read_image_input(
     input_path: Optional[Path] = None,
 ) -> tuple[bytes, Optional[ImageFormat]]:

@@ -94,6 +94,19 @@ image-edit edit vintage -i photo.jpg -o retro.png
 image-edit generate "a sunset over mountains" -o sunset.png
 ```
 
+### Combine multiple images
+
+```bash
+# Blend two images together
+image-edit combine "blend these images seamlessly" -i img1.jpg -i img2.jpg -o result.png
+
+# Create a panorama from multiple images
+image-edit combine "create a panorama" -i left.jpg -i center.jpg -i right.jpg -o panorama.png
+
+# Pipe one image via stdin, provide second via -i
+cat background.png | image-edit combine "overlay the logo" -i logo.png -o final.png
+```
+
 ### List available templates
 
 ```bash

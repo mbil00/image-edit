@@ -157,3 +157,65 @@ class GeminiProvider(Provider):
             if isinstance(e, ProviderError):
                 raise
             raise ProviderError(f"Gemini API error: {e}") from e
+
+    async def combine(
+        self,
+        images: list[tuple[bytes, Optional[str]]],
+        prompt: str,
+    ) -> EditResult:
+        """
+        Combine multiple images using Gemini.
+
+        Args:
+            images: List of (image_data, mime_type) tuples
+            prompt: Text description of how to combine the images
+
+        Returns:
+            EditResult containing the combined image
+        """
+        client = self._get_client()
+
+        # Build parts list with all images followed by prompt
+        parts = []
+        for image_data, mime_type in images:
+            if mime_type is None:
+                fmt = detect_format(image_data)
+                mime_type = fmt.mime_type if fmt else "image/png"
+            parts.append(types.Part.from_bytes(data=image_data, mime_type=mime_type))
+
+        parts.append(types.Part.from_text(text=prompt))
+
+        try:
+            response = client.models.generate_content(
+                model=self.model_name,
+                contents=[types.Content(parts=parts)],
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE", "TEXT"],
+                ),
+            )
+
+            # Extract image from response
+            for part in response.candidates[0].content.parts:
+                if part.inline_data is not None:
+                    return EditResult(
+                        image_data=part.inline_data.data,
+                        mime_type=part.inline_data.mime_type,
+                        provider=self.name,
+                        model=self.model_name,
+                    )
+
+            # No image in response - check for text error
+            text_parts = [
+                p.text for p in response.candidates[0].content.parts if p.text
+            ]
+            if text_parts:
+                raise ProviderError(
+                    f"Gemini returned text instead of image: {' '.join(text_parts)}"
+                )
+
+            raise ProviderError("Gemini response contained no image data")
+
+        except Exception as e:
+            if isinstance(e, ProviderError):
+                raise
+            raise ProviderError(f"Gemini API error: {e}") from e

@@ -18,10 +18,10 @@ from .config import (
     CONFIG_KEYS,
     DEFAULTS,
 )
-from .core import run_edit, run_generate, get_provider
+from .core import run_edit, run_generate, run_combine, get_provider
 from .providers import ProviderError
 from .templates import get_registry
-from .utils import read_image_input, write_image_output
+from .utils import read_image_input, read_multiple_images, write_image_output
 from .utils.image import format_from_extension, ImageFormat
 
 app = typer.Typer(
@@ -189,6 +189,100 @@ def generate(
         # Generate image
         with console.status(f"[bold blue]Generating with {provider}..."):
             result = run_generate(prompt, provider)
+
+        # Write output
+        write_image_output(result.image_data, output_file, fmt)
+
+        if output_file:
+            console.print(f"[green]Saved to {output_file}[/green]")
+
+    except ProviderError as e:
+        console.print(f"[red]Provider error: {e}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def combine(
+    prompt: Annotated[
+        str,
+        typer.Argument(
+            help="Description of how to combine the images"
+        ),
+    ],
+    input_files: Annotated[
+        list[Path],
+        typer.Option(
+            "--input",
+            "-i",
+            help="Input image files (minimum 2 required)",
+        ),
+    ] = [],
+    output_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output image file. If not provided, writes to stdout.",
+        ),
+    ] = None,
+    output_format: Annotated[
+        Optional[str],
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format: png, jpeg, webp, gif",
+        ),
+    ] = None,
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            "-p",
+            help="AI provider to use.",
+        ),
+    ] = "gemini",
+) -> None:
+    """
+    Combine multiple images using AI.
+
+    Examples:
+        image-edit combine "blend these images seamlessly" -i img1.jpg -i img2.jpg -o result.png
+        image-edit combine "create a panorama" -i left.jpg -i center.jpg -i right.jpg -o panorama.png
+        cat background.png | image-edit combine "overlay the logo" -i logo.png -o final.png
+    """
+    try:
+        # Read input images
+        with console.status("[bold blue]Reading images..."):
+            images_with_format = read_multiple_images(list(input_files))
+
+        # Validate minimum 2 images
+        if len(images_with_format) < 2:
+            console.print(
+                "[red]At least 2 images are required. "
+                "Provide multiple -i options or pipe one image via stdin.[/red]"
+            )
+            raise typer.Exit(1)
+
+        # Convert to format expected by run_combine (bytes, mime_type)
+        images: list[tuple[bytes, Optional[str]]] = [
+            (data, fmt.mime_type if fmt else None)
+            for data, fmt in images_with_format
+        ]
+
+        # Parse output format
+        fmt: Optional[ImageFormat] = None
+        if output_format:
+            fmt = format_from_extension(output_format)
+            if fmt is None:
+                console.print(f"[red]Unknown format: {output_format}[/red]")
+                raise typer.Exit(1)
+
+        # Perform combine
+        with console.status(f"[bold blue]Combining {len(images)} images with {provider}..."):
+            result = run_combine(images, prompt, provider)
 
         # Write output
         write_image_output(result.image_data, output_file, fmt)

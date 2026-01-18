@@ -135,3 +135,48 @@ def run_generate(
         EditResult with the generated image
     """
     return asyncio.run(generate_image(prompt, provider_name))
+
+
+async def combine_images(
+    images: list[tuple[bytes, Optional[str]]],
+    prompt: str,
+    provider_name: str = "gemini",
+) -> EditResult:
+    """
+    Combine multiple images using the specified provider.
+
+    Args:
+        images: List of (image_data, mime_type) tuples
+        prompt: Text description of how to combine the images
+        provider_name: Name of the provider to use
+
+    Returns:
+        EditResult with the combined image
+
+    Raises:
+        ValueError: If fewer than 2 images provided
+        ProviderError: If combining fails
+    """
+    if len(images) < 2:
+        raise ValueError("At least 2 images are required for combine operation")
+    provider = get_provider(provider_name)
+    return await provider.combine(images, prompt)
+
+
+def run_combine(
+    images: list[tuple[bytes, Optional[str]]],
+    prompt: str,
+    provider_name: str = "gemini",
+) -> EditResult:
+    """
+    Synchronous wrapper for combine_images.
+
+    Args:
+        images: List of (image_data, mime_type) tuples
+        prompt: Text description of how to combine the images
+        provider_name: Name of the provider to use
+
+    Returns:
+        EditResult with the combined image
+    """
+    return asyncio.run(combine_images(images, prompt, provider_name))

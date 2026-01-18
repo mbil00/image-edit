@@ -77,3 +77,24 @@ class Provider(ABC):
             ProviderError: If generation fails
         """
         pass
+
+    @abstractmethod
+    async def combine(
+        self,
+        images: list[tuple[bytes, Optional[str]]],
+        prompt: str,
+    ) -> EditResult:
+        """
+        Combine multiple images using the given prompt.
+
+        Args:
+            images: List of (image_data, mime_type) tuples
+            prompt: Text description of how to combine the images
+
+        Returns:
+            EditResult containing the combined image
+
+        Raises:
+            ProviderError: If the combine operation fails
+        """
+        pass
