@@ -19,7 +19,7 @@ pip install image-edit
 Install from source:
 
 ```bash
-git clone https://github.com/your-username/image-edit.git
+git clone https://github.com/mbil00/image-edit.git
 cd image-edit
 pip install -e .
 ```
